@@ -19,9 +19,16 @@ export function compareSelections(a: Selection, b: Selection): CompareResult {
 
 export function shouldCreateNewEntry(
 	current: HistoryEntry | null,
-	incoming: HistoryEntry
+	incoming: HistoryEntry,
+	isJump = false
 ): boolean {
 	if (!current) return true;
 	if (current.filePath !== incoming.filePath) return true;
-	return compareSelections(current.selection, incoming.selection) === CompareResult.DIFFERENT;
+
+	const result = compareSelections(current.selection, incoming.selection);
+
+	// Jumps (link clicks, go-to-heading) bypass the SIMILAR threshold
+	if (result === CompareResult.SIMILAR && isJump) return true;
+
+	return result === CompareResult.DIFFERENT;
 }

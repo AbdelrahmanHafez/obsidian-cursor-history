@@ -42,7 +42,16 @@ export default class CursorHistoryPlugin extends Plugin {
 			EditorView.updateListener.of((update: ViewUpdate) => {
 				if (this.isNavigating) return;
 				if (!update.selectionSet) return;
-				this.recordCurrentPosition();
+
+				// Detect if this selection change was a jump (link click, go-to-heading, etc.)
+				// CM6 marks programmatic/non-user selection changes with a userEvent annotation
+				const isJump = update.transactions.some(tr => {
+					const event = tr.annotation(EditorView.userEvent);
+					return event != null && event !== 'input' && event !== 'delete'
+						&& event !== 'undo' && event !== 'redo';
+				});
+
+				this.recordCurrentPosition(isJump);
 			})
 		);
 
@@ -90,11 +99,11 @@ export default class CursorHistoryPlugin extends Plugin {
 		return hm.getDefaultHotkeys(commandId) || [];
 	}
 
-	private recordCurrentPosition(): void {
+	private recordCurrentPosition(isJump = false): void {
 		const entry = this.getActiveEntry();
 		if (!entry) return;
 
-		if (shouldCreateNewEntry(this.currentState, entry)) {
+		if (shouldCreateNewEntry(this.currentState, entry, isJump)) {
 			this.navStack.push(entry);
 		} else {
 			this.navStack.replaceCurrent(entry);

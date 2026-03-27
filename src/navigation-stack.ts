@@ -17,6 +17,16 @@ export class NavigationStack {
 	private index = -1;
 
 	push(entry: HistoryEntry): void {
+		// Deduplicate: if current entry is the same file and same line, replace instead
+		if (this.index >= 0 && this.index < this.stack.length) {
+			const current = this.stack[this.index];
+			if (current.filePath === entry.filePath
+				&& current.selection.startLine === entry.selection.startLine) {
+				this.stack[this.index] = entry;
+				return;
+			}
+		}
+
 		// Discard forward history
 		if (this.index < this.stack.length - 1) {
 			this.stack = this.stack.slice(0, this.index + 1);
