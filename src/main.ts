@@ -1,12 +1,20 @@
 import { MarkdownView, Plugin, TFile } from 'obsidian';
+import { keymap } from '@codemirror/view';
 import { EditorView, ViewUpdate } from '@codemirror/view';
+import { Extension } from '@codemirror/state';
 import { NavigationStack, HistoryEntry } from './navigation-stack';
 import { shouldCreateNewEntry } from './selection-state';
+
+interface ObsidianHotkey {
+	modifiers: string[];
+	key: string;
+}
 
 export default class CursorHistoryPlugin extends Plugin {
 	private navStack = new NavigationStack();
 	private currentState: HistoryEntry | null = null;
 	private isNavigating = false;
+	private hotkeyExtension: Extension[] = [];
 
 	async onload() {
 		this.addCommand({
@@ -37,6 +45,49 @@ export default class CursorHistoryPlugin extends Plugin {
 				this.recordCurrentPosition();
 			})
 		);
+
+		// CM6 keymaps for key-repeat support
+		this.registerEditorExtension(this.hotkeyExtension);
+		this.app.workspace.onLayoutReady(() => this.buildKeymap());
+		this.registerEvent(
+			this.app.workspace.on('layout-change', () => this.buildKeymap())
+		);
+	}
+
+	private buildKeymap(): void {
+		const backKeys = this.getCommandHotkeys('cursor-history:go-back');
+		const forwardKeys = this.getCommandHotkeys('cursor-history:go-forward');
+
+		const bindings: Array<{ key: string; run: () => boolean }> = [];
+
+		for (const hk of backKeys) {
+			bindings.push({
+				key: [...hk.modifiers, hk.key].join('-'),
+				run: () => { this.goBack(); return true; },
+			});
+		}
+
+		for (const hk of forwardKeys) {
+			bindings.push({
+				key: [...hk.modifiers, hk.key].join('-'),
+				run: () => { this.goForward(); return true; },
+			});
+		}
+
+		this.hotkeyExtension.length = 0;
+		if (bindings.length > 0) {
+			this.hotkeyExtension.push(keymap.of(bindings));
+		}
+		this.app.workspace.updateOptions();
+	}
+
+	private getCommandHotkeys(commandId: string): ObsidianHotkey[] {
+		const hm = (this.app as any).hotkeyManager;
+		if (!hm) return [];
+
+		const custom = hm.getHotkeys(commandId);
+		if (custom !== undefined) return custom;
+		return hm.getDefaultHotkeys(commandId) || [];
 	}
 
 	private recordCurrentPosition(): void {
@@ -72,7 +123,6 @@ export default class CursorHistoryPlugin extends Plugin {
 	}
 
 	private async goBack(): Promise<void> {
-		// Before going back, make sure the current position is recorded
 		const current = this.getActiveEntry();
 		if (current && shouldCreateNewEntry(this.currentState, current)) {
 			this.navStack.push(current);
@@ -122,7 +172,6 @@ export default class CursorHistoryPlugin extends Plugin {
 
 			this.currentState = entry;
 		} finally {
-			// Delay clearing the flag to let events from navigation settle
 			setTimeout(() => {
 				this.isNavigating = false;
 			}, 100);
