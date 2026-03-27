@@ -16,19 +16,6 @@ export class NavigationStack {
 	private stack: HistoryEntry[] = [];
 	private index = -1;
 
-	get canGoBack(): boolean {
-		return this.index > 0;
-	}
-
-	get canGoForward(): boolean {
-		return this.index < this.stack.length - 1;
-	}
-
-	get currentEntry(): HistoryEntry | null {
-		if (this.index < 0 || this.index >= this.stack.length) return null;
-		return this.stack[this.index];
-	}
-
 	push(entry: HistoryEntry): void {
 		// Discard forward history
 		if (this.index < this.stack.length - 1) {
@@ -52,13 +39,13 @@ export class NavigationStack {
 	}
 
 	goBack(): HistoryEntry | null {
-		if (!this.canGoBack) return null;
+		if (this.index <= 0) return null;
 		this.index--;
 		return this.stack[this.index];
 	}
 
 	goForward(): HistoryEntry | null {
-		if (!this.canGoForward) return null;
+		if (this.index >= this.stack.length - 1) return null;
 		this.index++;
 		return this.stack[this.index];
 	}

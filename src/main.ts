@@ -1,4 +1,4 @@
-import { MarkdownView, Plugin } from 'obsidian';
+import { MarkdownView, Plugin, TFile } from 'obsidian';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { NavigationStack, HistoryEntry } from './navigation-stack';
 import { shouldCreateNewEntry } from './selection-state';
@@ -84,6 +84,12 @@ export default class CursorHistoryPlugin extends Plugin {
 	}
 
 	private async goForward(): Promise<void> {
+		const current = this.getActiveEntry();
+		if (current && shouldCreateNewEntry(this.currentState, current)) {
+			this.navStack.push(current);
+			this.currentState = current;
+		}
+
 		const entry = this.navStack.goForward();
 		if (entry) await this.navigateTo(entry);
 	}
@@ -93,13 +99,10 @@ export default class CursorHistoryPlugin extends Plugin {
 
 		try {
 			const file = this.app.vault.getAbstractFileByPath(entry.filePath);
-			if (!file) {
-				this.isNavigating = false;
-				return;
-			}
+			if (!(file instanceof TFile)) return;
 
 			const leaf = this.app.workspace.getLeaf(false);
-			await leaf.openFile(file as any);
+			await leaf.openFile(file);
 
 			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 			if (view) {
