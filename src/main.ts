@@ -102,17 +102,9 @@ export default class CursorHistoryPlugin extends Plugin {
 			// File doesn't exist or is invalid
 		}
 
-		const usedCombos = new Set<string>();
-		for (const bindings of Object.values(hotkeys)) {
-			for (const hk of bindings) {
-				usedCombos.add(hotkeyToString(hk));
-			}
-		}
-
 		let changed = false;
 		for (const [cmdId, hk] of Object.entries(DESIRED_HOTKEYS)) {
 			if (hotkeys[cmdId]) continue;
-			if (usedCombos.has(hotkeyToString(hk))) continue;
 			hotkeys[cmdId] = [hk];
 			changed = true;
 		}
@@ -253,6 +245,3 @@ export default class CursorHistoryPlugin extends Plugin {
 	}
 }
 
-function hotkeyToString(hk: ObsidianHotkey): string {
-	return [...hk.modifiers].sort().join('+') + '+' + hk.key;
-}
