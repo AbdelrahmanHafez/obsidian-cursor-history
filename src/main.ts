@@ -17,13 +17,18 @@ declare module 'obsidian' {
 		hotkeyManager: {
 			getHotkeys(id: string): ObsidianHotkey[] | undefined;
 			getDefaultHotkeys(id: string): ObsidianHotkey[];
+			load(): Promise<void>;
 		};
 	}
 }
 
-const DEFAULT_HOTKEYS: Record<string, ObsidianHotkey[]> = {
-	'go-back': [{ modifiers: ['Ctrl', 'Mod'], key: 'ArrowLeft' }],
-	'go-forward': [{ modifiers: ['Ctrl', 'Mod'], key: 'ArrowRight' }],
+interface PluginData {
+	hotkeyDefaultsApplied?: boolean;
+}
+
+const DESIRED_HOTKEYS: Record<string, ObsidianHotkey> = {
+	'cursor-history:go-back': { modifiers: ['Ctrl', 'Mod'], key: 'ArrowLeft' },
+	'cursor-history:go-forward': { modifiers: ['Ctrl', 'Mod'], key: 'ArrowRight' },
 };
 
 // --- Plugin ---
@@ -33,8 +38,11 @@ export default class CursorHistoryPlugin extends Plugin {
 	private currentState: HistoryEntry | null = null;
 	private isNavigating = false;
 	private hotkeyExtension: Extension[] = [];
+	private pluginData: PluginData = {};
 
-	onload() {
+	async onload() {
+		this.pluginData = (await this.loadData()) || {};
+
 		this.addCommand({
 			id: 'go-back',
 			name: 'Go back',
@@ -61,7 +69,6 @@ export default class CursorHistoryPlugin extends Plugin {
 				if (this.isNavigating) return;
 				if (!update.selectionSet) return;
 
-				// Detect if this selection change was a jump (link click, go-to-heading, etc.)
 				const isJump = update.transactions.some(tr => {
 					const event = tr.annotation(EditorView.userEvent);
 					return event != null && event !== 'input' && event !== 'delete'
@@ -74,15 +81,56 @@ export default class CursorHistoryPlugin extends Plugin {
 
 		// CM6 keymaps for key-repeat support
 		this.registerEditorExtension(this.hotkeyExtension);
-		this.app.workspace.onLayoutReady(() => this.buildKeymap());
+		this.app.workspace.onLayoutReady(async () => {
+			await this.applyDefaultHotkeys();
+			this.buildKeymap();
+		});
 		this.registerEvent(
 			this.app.workspace.on('layout-change', () => this.buildKeymap())
 		);
 	}
 
+	private async applyDefaultHotkeys() {
+		if (this.pluginData.hotkeyDefaultsApplied) return;
+
+		const configPath = `${this.app.vault.configDir}/hotkeys.json`;
+		let hotkeys: Record<string, ObsidianHotkey[]> = {};
+
+		try {
+			hotkeys = JSON.parse(await this.app.vault.adapter.read(configPath));
+		} catch {
+			// File doesn't exist or is invalid
+		}
+
+		const usedCombos = new Set<string>();
+		for (const bindings of Object.values(hotkeys)) {
+			for (const hk of bindings) {
+				usedCombos.add(hotkeyToString(hk));
+			}
+		}
+
+		let changed = false;
+		for (const [cmdId, hk] of Object.entries(DESIRED_HOTKEYS)) {
+			if (hotkeys[cmdId]) continue;
+			if (usedCombos.has(hotkeyToString(hk))) continue;
+			hotkeys[cmdId] = [hk];
+			changed = true;
+		}
+
+		if (changed) {
+			await this.app.vault.adapter.write(configPath, JSON.stringify(hotkeys, null, '  '));
+			if (typeof this.app.hotkeyManager?.load === 'function') {
+				await this.app.hotkeyManager.load();
+			}
+		}
+
+		this.pluginData.hotkeyDefaultsApplied = true;
+		await this.saveData(this.pluginData);
+	}
+
 	private buildKeymap(): void {
-		const backKeys = this.getCommandHotkeys('cursor-history:go-back', DEFAULT_HOTKEYS['go-back']);
-		const forwardKeys = this.getCommandHotkeys('cursor-history:go-forward', DEFAULT_HOTKEYS['go-forward']);
+		const backKeys = this.getCommandHotkeys('cursor-history:go-back');
+		const forwardKeys = this.getCommandHotkeys('cursor-history:go-forward');
 
 		const bindings: Array<{ key: string; run: () => boolean }> = [];
 
@@ -107,13 +155,13 @@ export default class CursorHistoryPlugin extends Plugin {
 		this.app.workspace.updateOptions();
 	}
 
-	private getCommandHotkeys(commandId: string, fallback: ObsidianHotkey[]): ObsidianHotkey[] {
+	private getCommandHotkeys(commandId: string): ObsidianHotkey[] {
 		const hm = this.app.hotkeyManager;
-		if (!hm) return fallback;
+		if (!hm) return [];
 
 		const custom = hm.getHotkeys(commandId);
 		if (custom !== undefined) return custom;
-		return fallback;
+		return hm.getDefaultHotkeys(commandId) || [];
 	}
 
 	private recordCurrentPosition(isJump = false): void {
@@ -203,4 +251,8 @@ export default class CursorHistoryPlugin extends Plugin {
 			}, 100);
 		}
 	}
+}
+
+function hotkeyToString(hk: ObsidianHotkey): string {
+	return [...hk.modifiers].sort().join('+') + '+' + hk.key;
 }
