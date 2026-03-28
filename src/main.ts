@@ -5,10 +5,28 @@ import { Extension } from '@codemirror/state';
 import { NavigationStack, HistoryEntry } from './navigation-stack';
 import { shouldCreateNewEntry } from './selection-state';
 
+// --- Obsidian type augmentation for undocumented APIs ---
+
 interface ObsidianHotkey {
 	modifiers: string[];
 	key: string;
 }
+
+declare module 'obsidian' {
+	interface App {
+		hotkeyManager: {
+			getHotkeys(id: string): ObsidianHotkey[] | undefined;
+			getDefaultHotkeys(id: string): ObsidianHotkey[];
+		};
+	}
+}
+
+const DEFAULT_HOTKEYS: Record<string, ObsidianHotkey[]> = {
+	'go-back': [{ modifiers: ['Ctrl', 'Mod'], key: 'ArrowLeft' }],
+	'go-forward': [{ modifiers: ['Ctrl', 'Mod'], key: 'ArrowRight' }],
+};
+
+// --- Plugin ---
 
 export default class CursorHistoryPlugin extends Plugin {
 	private navStack = new NavigationStack();
@@ -16,17 +34,17 @@ export default class CursorHistoryPlugin extends Plugin {
 	private isNavigating = false;
 	private hotkeyExtension: Extension[] = [];
 
-	async onload() {
+	onload() {
 		this.addCommand({
 			id: 'go-back',
 			name: 'Go back',
-			callback: () => this.goBack(),
+			callback: () => void this.goBack(),
 		});
 
 		this.addCommand({
 			id: 'go-forward',
 			name: 'Go forward',
-			callback: () => this.goForward(),
+			callback: () => void this.goForward(),
 		});
 
 		// Listen for file switches
@@ -44,7 +62,6 @@ export default class CursorHistoryPlugin extends Plugin {
 				if (!update.selectionSet) return;
 
 				// Detect if this selection change was a jump (link click, go-to-heading, etc.)
-				// CM6 marks programmatic/non-user selection changes with a userEvent annotation
 				const isJump = update.transactions.some(tr => {
 					const event = tr.annotation(EditorView.userEvent);
 					return event != null && event !== 'input' && event !== 'delete'
@@ -64,22 +81,22 @@ export default class CursorHistoryPlugin extends Plugin {
 	}
 
 	private buildKeymap(): void {
-		const backKeys = this.getCommandHotkeys('cursor-history:go-back');
-		const forwardKeys = this.getCommandHotkeys('cursor-history:go-forward');
+		const backKeys = this.getCommandHotkeys('cursor-history:go-back', DEFAULT_HOTKEYS['go-back']);
+		const forwardKeys = this.getCommandHotkeys('cursor-history:go-forward', DEFAULT_HOTKEYS['go-forward']);
 
 		const bindings: Array<{ key: string; run: () => boolean }> = [];
 
 		for (const hk of backKeys) {
 			bindings.push({
 				key: [...hk.modifiers, hk.key].join('-'),
-				run: () => { this.goBack(); return true; },
+				run: () => { void this.goBack(); return true; },
 			});
 		}
 
 		for (const hk of forwardKeys) {
 			bindings.push({
 				key: [...hk.modifiers, hk.key].join('-'),
-				run: () => { this.goForward(); return true; },
+				run: () => { void this.goForward(); return true; },
 			});
 		}
 
@@ -90,13 +107,13 @@ export default class CursorHistoryPlugin extends Plugin {
 		this.app.workspace.updateOptions();
 	}
 
-	private getCommandHotkeys(commandId: string): ObsidianHotkey[] {
-		const hm = (this.app as any).hotkeyManager;
-		if (!hm) return [];
+	private getCommandHotkeys(commandId: string, fallback: ObsidianHotkey[]): ObsidianHotkey[] {
+		const hm = this.app.hotkeyManager;
+		if (!hm) return fallback;
 
 		const custom = hm.getHotkeys(commandId);
 		if (custom !== undefined) return custom;
-		return hm.getDefaultHotkeys(commandId) || [];
+		return fallback;
 	}
 
 	private recordCurrentPosition(isJump = false): void {
