@@ -6,7 +6,10 @@ on:
       - '*'
 
 permissions:
+  attestations: write
+  artifact-metadata: write
   contents: write
+  id-token: write
 
 jobs:
   build:
@@ -18,8 +21,15 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
       - uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           files: |
             main.js
             manifest.json
