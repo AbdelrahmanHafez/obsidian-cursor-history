@@ -26,12 +26,12 @@ An [Obsidian](https://obsidian.md) plugin that tracks cursor position history ac
 
 ## Configuration
 
-Default keybindings are set up automatically on first install:
+In Editing mode, the plugin recognizes these bindings unless you configure different ones:
 
 | Command | Default Binding |
 |---------|-----------------|
-| Cursor History: Go back | Ctrl+Cmd+← |
-| Cursor History: Go forward | Ctrl+Cmd+→ |
+| Cursor History: Go back | Ctrl+Cmd+Left |
+| Cursor History: Go forward | Ctrl+Cmd+Right |
 
 To change them, open **Settings > Hotkeys** and search for "Cursor History".
 

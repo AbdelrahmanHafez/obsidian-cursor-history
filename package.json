@@ -5,11 +5,14 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "node esbuild.config.mjs production"
+		"build": "node esbuild.config.mjs production",
+		"test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.mts"
 	},
 	"keywords": ["obsidian", "plugin", "cursor", "history", "navigation"],
 	"license": "MIT",
 	"devDependencies": {
+		"@codemirror/state": "^6.5.0",
+		"@codemirror/view": "^6.38.6",
 		"@types/node": "^22.0.0",
 		"esbuild": "^0.24.0",
 		"obsidian": "latest",

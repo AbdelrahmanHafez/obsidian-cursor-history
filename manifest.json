@@ -1,7 +1,7 @@
 {
 	"id": "cursor-history",
 	"name": "Cursor History",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"minAppVersion": "1.0.0",
 	"description": "Navigate back and forward through cursor position history across files, like VS Code.",
 	"author": "Hafez",
