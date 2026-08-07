@@ -1,49 +1,52 @@
 # Cursor History
 
-An [Obsidian](https://obsidian.md) plugin that tracks cursor position history across files and lets you navigate back and forward, like VS Code's `workbench.action.navigateBack` / `workbench.action.navigateForward`.
+<p align="center">
+  <strong>Go back to the exact place you were.</strong><br>
+  Return to exact cursor positions across Obsidian notes, like Back and Forward in a browser.
+</p>
 
-## Features
+<p align="center">
+  <a href="https://community.obsidian.md/plugins/cursor-history">
+    <img src="docs/assets/install-in-obsidian.svg" alt="View and install Cursor History in Obsidian" height="48">
+  </a>
+</p>
 
-- Tracks cursor positions across files with a 10-line threshold (small movements update the current entry, large jumps create new ones)
-- Navigate back and forward through your cursor history
-- Browser-style stack: going back then moving somewhere new clears the forward history
-- Session-based, max 50 entries
+| Three notes later | Back to the exact selection |
+| --- | --- |
+| ![Cursor History at the latest cursor position](docs/assets/cursor-history-latest.png) | ![Cursor History navigating back to an earlier selection](docs/assets/cursor-history-back.png) |
 
-## Installation
+## See it in action
 
-### From Obsidian Community Plugins
+![Cursor History demo showing back and forward navigation with visible keyboard shortcuts](docs/assets/cursor-history-demo.gif)
 
-1. Open **Settings > Community plugins**
-2. Search for **Cursor History**
-3. Click **Install**, then **Enable**
+<p align="center">
+  <a href="docs/assets/cursor-history-demo.mp4">Watch the full-quality recording</a>
+</p>
 
-### Manual Installation
+## What it does
 
-1. Download `main.js` and `manifest.json` from the [latest release](https://github.com/AbdelrahmanHafez/obsidian-cursor-history/releases/latest)
-2. Create a folder `cursor-history` inside your vault's `.obsidian/plugins/` directory
-3. Place the downloaded files inside that folder
-4. Reload Obsidian and enable the plugin in **Settings > Community plugins**
+- Reopens the note, restores the exact cursor or selection, and brings it into view
+- Navigates backward and forward through recent editing locations
+- Groups ordinary movements within 10 lines into one history stop
+- Creates a new stop for file changes and explicit cursor jumps
+- Keeps up to 50 positions for the current Obsidian session
 
-## Configuration
+Going back and then navigating somewhere new clears the forward history, matching browser behavior.
 
-In Editing mode, the plugin recognizes these bindings unless you configure different ones:
+## Shortcuts
 
-| Command | Default Binding |
-|---------|-----------------|
-| Cursor History: Go back | Ctrl+Cmd+Left |
-| Cursor History: Go forward | Ctrl+Cmd+Right |
+| Action | Editing mode default |
+| --- | --- |
+| Go back | `Ctrl` + `Cmd` + `Left` |
+| Go forward | `Ctrl` + `Cmd` + `Right` |
 
-To change them, open **Settings > Hotkeys** and search for "Cursor History".
+Change either binding in **Settings > Hotkeys** by searching for “Cursor History.”
 
-## How It Works
+## Install
 
-The plugin uses VS Code's position-based heuristic (not timer-based polling):
+Open [Cursor History in the Obsidian Community directory](https://community.obsidian.md/plugins/cursor-history), then press **Add to Obsidian**.
 
-- **Same line**: updates the current history entry (no new stop)
-- **Within 10 lines**: updates the current entry
-- **10+ lines apart**: creates a new history entry
-- **Different file**: always creates a new entry
-- **Going back then navigating**: clears forward history (browser-style)
+For a manual installation, download `main.js` and `manifest.json` from the [latest release](https://github.com/AbdelrahmanHafez/obsidian-cursor-history/releases/latest), then place them in `<vault>/.obsidian/plugins/cursor-history/`.
 
 ## License
 
