@@ -1,4 +1,4 @@
-import { activeWindow, MarkdownView, Plugin, TFile } from 'obsidian';
+import { MarkdownView, Plugin, TFile } from 'obsidian';
 import { keymap } from '@codemirror/view';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
@@ -188,7 +188,7 @@ export default class CursorHistoryPlugin extends Plugin {
 
 			this.currentState = entry;
 		} finally {
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				this.isNavigating = false;
 			}, 100);
 		}
