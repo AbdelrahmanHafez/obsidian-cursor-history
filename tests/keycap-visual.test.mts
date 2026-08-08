@@ -5,105 +5,151 @@ import { describe, it } from 'node:test';
 
 const FRAME_WIDTH = 1280;
 const FRAME_HEIGHT = 720;
-const OVERLAY_REGION = { x: 250, y: 520, width: 780, height: 190 };
-const DIFFERENCE_THRESHOLD = 32;
+const KEYCAP_CANVAS = { x: 440, y: 610, width: 400, height: 100 };
+const CLEARLY_VISIBLE_PURPLE_PIXELS = 1_800;
 
-const SAMPLE_TIMES = {
-	base: 5.5,
-	fadeIn: 5.85,
-	held: 6.2,
-	fadeOut: 6.6,
-	off: 6.82,
-};
+const HISTORY_ACTIONS = [
+	{ label: 'Back to C', onset: 6.85 },
+	{ label: 'Back to B', onset: 8.6 },
+	{ label: 'Back to A', onset: 10.6 },
+	{ label: 'Forward to B', onset: 12.6 },
+	{ label: 'Forward to C', onset: 14.2 },
+	{ label: 'Forward to D', onset: 15.95 },
+] as const;
+
+const PHASE_OFFSETS = {
+	before: -0.48,
+	fadeIn: -0.1,
+	preHeld: -0.02,
+	onset: 0,
+	held: 0.25,
+	postHeld: 0.5,
+	fadeOut: 0.6,
+	off: 0.72,
+} as const;
 
 describe('Cursor History demo keycaps', () => {
-	it('uses compact, evenly aligned keyboard keycaps', () => {
-		// Arrange
-		const { frame } = createTestContext();
-		const base = frame('base');
-		const held = frame('held');
+	for (const { label, onset } of HISTORY_ACTIONS) {
+		it(`times the ${label} shortcut card with its action`, () => {
+			// Arrange
+			const { frame } = createTestContext();
 
-		// Act
-		const overlayBounds = differenceBounds(base, held, OVERLAY_REGION);
-		const keycaps = findKeycapBounds(base, held, overlayBounds);
-		const glyphs = keycaps.map((keycap) =>
-			glyphBounds(base, held, keycap)
-		);
+			// Act
+			const before = frame(onset + PHASE_OFFSETS.before);
+			const fadeIn = frame(onset + PHASE_OFFSETS.fadeIn);
+			const preHeld = frame(onset + PHASE_OFFSETS.preHeld);
+			const action = frame(onset + PHASE_OFFSETS.onset);
+			const held = frame(onset + PHASE_OFFSETS.held);
+			const postHeld = frame(onset + PHASE_OFFSETS.postHeld);
+			const fadeOut = frame(onset + PHASE_OFFSETS.fadeOut);
+			const off = frame(onset + PHASE_OFFSETS.off);
+			const fadeInEnergy = differenceEnergy(before, preHeld, KEYCAP_CANVAS);
+			const fadeOutEnergy = differenceEnergy(off, postHeld, KEYCAP_CANVAS);
+			const fadeInRatio = differenceEnergy(before, fadeIn, KEYCAP_CANVAS) / fadeInEnergy;
+			const fadeOutRatio = differenceEnergy(off, fadeOut, KEYCAP_CANVAS) / fadeOutEnergy;
+			const keycaps = findKeycapBounds(action);
 
-		// Assert
-		assert.ok(
-			overlayBounds.width <= 390,
-			`shortcut keycaps must stay compact; detected a ${overlayBounds.width}px-wide overlay`
-		);
-		assert.ok(
-			overlayBounds.height <= 66,
-			`shortcut keycaps must use keyboard-like height; detected ${overlayBounds.height}px`
-		);
-		assert.equal(keycaps.length, 3, 'the shortcut overlay must contain three keycaps');
-		assert.ok(
-			range(keycaps.map(({ height }) => height)) <= 2,
-			'keycaps must share one consistent height'
-		);
-		assert.ok(
-			range(keycapGaps(keycaps)) <= 2,
-			'keycaps must use even inter-key gaps'
-		);
-		assert.ok(
-			glyphs.every((glyph, index) =>
-				centerDistance(glyph, keycaps[index]) <= 3
-			),
-			'glyphs must be visually centered inside their keycaps'
-		);
-		assert.ok(
-			range(glyphs.map((glyph, index) => averagePadding(glyph, keycaps[index]))) <= 5,
-			'keycaps must use balanced horizontal padding'
-		);
-	});
+			// Assert
+			assert.equal(
+				findKeycapBounds(before).length,
+				0,
+				`${label} shortcut must still be absent 0.48 seconds before the action`
+			);
+			assert.equal(
+				findKeycapBounds(preHeld).length,
+				3,
+				`${label} shortcut must finish fading in before the action starts`
+			);
+			assert.ok(
+				countPurplePixels(preHeld, KEYCAP_CANVAS) >= CLEARLY_VISIBLE_PURPLE_PIXELS,
+				`${label} shortcut must be clearly visible before the action starts`
+			);
+			assert.equal(
+				keycaps.length,
+				3,
+				`${label} shortcut must be visible when the action starts`
+			);
+			assert.ok(
+				countPurplePixels(action, KEYCAP_CANVAS) >= CLEARLY_VISIBLE_PURPLE_PIXELS,
+				`${label} shortcut must be clearly visible at action onset`
+			);
+			assert.equal(
+				findKeycapBounds(held).length,
+				3,
+				`${label} shortcut must remain visible 0.25 seconds after the action starts`
+			);
+			assert.ok(
+				countPurplePixels(held, KEYCAP_CANVAS) >= CLEARLY_VISIBLE_PURPLE_PIXELS,
+				`${label} shortcut must remain clearly visible 0.25 seconds after the action starts`
+			);
+			assert.equal(
+				findKeycapBounds(postHeld).length,
+				3,
+				`${label} shortcut must remain visible through the 0.5-second viewport motion`
+			);
+			assert.ok(
+				countPurplePixels(postHeld, KEYCAP_CANVAS) >= CLEARLY_VISIBLE_PURPLE_PIXELS,
+				`${label} shortcut must remain clearly visible through the 0.5-second viewport motion`
+			);
+			assert.ok(
+				fadeInRatio >= 0.2 && fadeInRatio <= 0.8,
+				`${label} fade-in must have partial opacity halfway through its 0.2-second transition; measured ${formatRatio(fadeInRatio)}`
+			);
+			assert.ok(
+				fadeOutRatio >= 0.2 && fadeOutRatio <= 0.8,
+				`${label} fade-out must have partial opacity halfway through its 0.2-second transition; measured ${formatRatio(fadeOutRatio)}`
+			);
+			assert.equal(
+				findKeycapBounds(off).length,
+				0,
+				`${label} shortcut must finish fading 0.72 seconds after the action starts`
+			);
 
-	it('fades the shortcut overlay in and out over about 0.2 seconds', () => {
-		// Arrange
-		const { frame } = createTestContext();
-		const base = frame('base');
-		const fadeIn = frame('fadeIn');
-		const held = frame('held');
-		const fadeOut = frame('fadeOut');
-		const off = frame('off');
-
-		// Act
-		const heldEnergy = differenceEnergy(base, held, OVERLAY_REGION);
-		const fadeInRatio = differenceEnergy(base, fadeIn, OVERLAY_REGION) / heldEnergy;
-		const fadeOutRatio = differenceEnergy(base, fadeOut, OVERLAY_REGION) / heldEnergy;
-		const offRatio = differenceEnergy(base, off, OVERLAY_REGION) / heldEnergy;
-
-		// Assert
-		assert.ok(
-			fadeInRatio >= 0.2 && fadeInRatio <= 0.8,
-			`shortcut fade-in must have partial opacity; measured ${formatRatio(fadeInRatio)}`
-		);
-		assert.ok(
-			fadeOutRatio >= 0.2 && fadeOutRatio <= 0.8,
-			`shortcut fade-out must have partial opacity; measured ${formatRatio(fadeOutRatio)}`
-		);
-		assert.ok(
-			offRatio <= 0.08,
-			`shortcut overlay must finish fading before navigation; measured ${formatRatio(offRatio)}`
-		);
-	});
+			const overlayBounds = combinedBounds(keycaps);
+			const glyphs = keycaps.map((keycap) => glyphBounds(action, keycap));
+			assert.ok(
+				overlayBounds.width <= 390,
+				`${label} shortcut must stay compact; detected a ${overlayBounds.width}px-wide overlay`
+			);
+			assert.ok(
+				overlayBounds.height <= 66,
+				`${label} shortcut must use keyboard-like height; detected ${overlayBounds.height}px`
+			);
+			assert.ok(
+				range(keycaps.map(({ height }) => height)) <= 2,
+				`${label} keycaps must share one consistent height`
+			);
+			assert.ok(
+				range(keycapGaps(keycaps)) <= 2,
+				`${label} keycaps must use even inter-key gaps`
+			);
+			assert.ok(
+				glyphs.every((glyph, index) =>
+					centerDistance(glyph, keycaps[index]) <= 3
+				),
+				`${label} glyphs must be visually centered inside their keycaps`
+			);
+			assert.ok(
+				range(glyphs.map((glyph, index) => averagePadding(glyph, keycaps[index]))) <= 5,
+				`${label} keycaps must use balanced horizontal padding`
+			);
+		});
+	}
 
 	function createTestContext({
 		videoUrl = new URL('../docs/assets/cursor-history-demo.mp4', import.meta.url),
 	} = {}) {
-		const decodedFrames = new Map<keyof typeof SAMPLE_TIMES, Buffer>();
+		const decodedFrames = new Map<number, Buffer>();
 
 		return {
-			frame(sample: keyof typeof SAMPLE_TIMES) {
-				const cached = decodedFrames.get(sample);
+			frame(time: number) {
+				const cached = decodedFrames.get(time);
 				if (cached) {
 					return cached;
 				}
 
-				const decoded = decodeFrame(fileURLToPath(videoUrl), SAMPLE_TIMES[sample]);
-				decodedFrames.set(sample, decoded);
+				const decoded = decodeFrame(fileURLToPath(videoUrl), time);
+				decodedFrames.set(time, decoded);
 				return decoded;
 			},
 		};
@@ -148,47 +194,23 @@ function decodeFrame(videoPath: string, time: number) {
 	return result.stdout;
 }
 
-function differenceBounds(left: Buffer, right: Buffer, region: Bounds): Bounds {
-	let minX = region.x + region.width;
-	let minY = region.y + region.height;
-	let maxX = -1;
-	let maxY = -1;
-
-	forEachPixel(region, (x, y, offset) => {
-		if (pixelDifference(left, right, offset) < DIFFERENCE_THRESHOLD) return;
-		minX = Math.min(minX, x);
-		minY = Math.min(minY, y);
-		maxX = Math.max(maxX, x);
-		maxY = Math.max(maxY, y);
-	});
-
-	assert.ok(maxX >= minX && maxY >= minY, 'expected a visible shortcut overlay');
-	return {
-		x: minX,
-		y: minY,
-		width: maxX - minX + 1,
-		height: maxY - minY + 1,
-	};
-}
-
-function findKeycapBounds(left: Buffer, right: Buffer, region: Bounds) {
+function findKeycapBounds(frame: Buffer) {
+	const region = KEYCAP_CANVAS;
 	const width = region.width;
 	const height = region.height;
 	const mask = new Uint8Array(width * height);
 
 	forEachPixel(region, (x, y, offset) => {
-		const red = right[offset];
-		const green = right[offset + 1];
-		const blue = right[offset + 2];
+		const red = frame[offset];
+		const green = frame[offset + 1];
+		const blue = frame[offset + 2];
 		const localOffset = (y - region.y) * width + (x - region.x);
-		const changed = pixelDifference(left, right, offset) >= 20;
-		const purple = blue >= 120 && red >= 60 && blue - green >= 35 && blue - red >= 20;
-		if (changed && purple) mask[localOffset] = 1;
+		if (isPurple(red, green, blue)) mask[localOffset] = 1;
 	});
 
 	const components = connectedComponents(mask, width, height)
 		.filter(({ pixels, width: componentWidth, height: componentHeight }) =>
-			pixels >= 80 && componentWidth >= 35 && componentHeight >= 35
+			pixels >= 300 && componentWidth >= 40 && componentHeight >= 45
 		)
 		.map((bounds) => ({
 			x: bounds.x + region.x,
@@ -199,6 +221,15 @@ function findKeycapBounds(left: Buffer, right: Buffer, region: Bounds) {
 		.sort((leftBounds, rightBounds) => leftBounds.x - rightBounds.x);
 
 	return components;
+}
+
+function combinedBounds(bounds: Bounds[]): Bounds {
+	assert.ok(bounds.length > 0, 'expected a visible shortcut overlay');
+	const minX = Math.min(...bounds.map(({ x }) => x));
+	const minY = Math.min(...bounds.map(({ y }) => y));
+	const maxX = Math.max(...bounds.map(({ x, width }) => x + width));
+	const maxY = Math.max(...bounds.map(({ y, height }) => y + height));
+	return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
 function connectedComponents(mask: Uint8Array, width: number, height: number) {
@@ -255,19 +286,19 @@ function neighbors(x: number, y: number, width: number, height: number) {
 	return result;
 }
 
-function glyphBounds(left: Buffer, right: Buffer, keycap: Bounds) {
+function glyphBounds(frame: Buffer, keycap: Bounds) {
 	let minX = keycap.x + keycap.width;
 	let minY = keycap.y + keycap.height;
 	let maxX = -1;
 	let maxY = -1;
 
 	forEachPixel(keycap, (x, y, offset) => {
-		const red = right[offset];
-		const green = right[offset + 1];
-		const blue = right[offset + 2];
+		const red = frame[offset];
+		const green = frame[offset + 1];
+		const blue = frame[offset + 2];
 		const neutral = Math.max(red, green, blue) - Math.min(red, green, blue) <= 35;
 		const bright = red >= 150 && green >= 150 && blue >= 150;
-		if (!neutral || !bright || pixelDifference(left, right, offset) < 20) return;
+		if (!neutral || !bright) return;
 		minX = Math.min(minX, x);
 		minY = Math.min(minY, y);
 		maxX = Math.max(maxX, x);
@@ -283,6 +314,18 @@ function glyphBounds(left: Buffer, right: Buffer, keycap: Bounds) {
 	};
 }
 
+function countPurplePixels(frame: Buffer, region: Bounds) {
+	let count = 0;
+	forEachPixel(region, (_x, _y, offset) => {
+		if (isPurple(frame[offset], frame[offset + 1], frame[offset + 2])) count++;
+	});
+	return count;
+}
+
+function isPurple(red: number, green: number, blue: number) {
+	return blue >= 120 && red >= 60 && blue - green >= 35 && blue - red >= 20;
+}
+
 function differenceEnergy(left: Buffer, right: Buffer, region: Bounds) {
 	let energy = 0;
 	forEachPixel(region, (_x, _y, offset) => {
@@ -291,14 +334,6 @@ function differenceEnergy(left: Buffer, right: Buffer, region: Bounds) {
 		energy += Math.abs(left[offset + 2] - right[offset + 2]);
 	});
 	return energy;
-}
-
-function pixelDifference(left: Buffer, right: Buffer, offset: number) {
-	return Math.max(
-		Math.abs(left[offset] - right[offset]),
-		Math.abs(left[offset + 1] - right[offset + 1]),
-		Math.abs(left[offset + 2] - right[offset + 2])
-	);
 }
 
 function forEachPixel(
