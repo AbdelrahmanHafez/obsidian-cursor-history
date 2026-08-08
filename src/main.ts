@@ -1,4 +1,4 @@
-import { MarkdownView, Plugin, TFile } from 'obsidian';
+import { MarkdownView, Platform, Plugin, TFile } from 'obsidian';
 import { keymap } from '@codemirror/view';
 import { EditorView, ViewUpdate } from '@codemirror/view';
 import { Extension } from '@codemirror/state';
@@ -22,6 +22,8 @@ const DEFAULT_HOTKEYS: Record<string, ObsidianHotkey[]> = {
 	'cursor-history:go-forward': [{ modifiers: ['Ctrl', 'Mod'], key: 'ArrowRight' }],
 };
 
+type NavigationDirection = 'back' | 'forward';
+
 // --- Plugin ---
 
 export default class CursorHistoryPlugin extends Plugin {
@@ -29,19 +31,31 @@ export default class CursorHistoryPlugin extends Plugin {
 	private currentState: HistoryEntry | null = null;
 	private isNavigating = false;
 	private hotkeyExtension: Extension[] = [];
+	private navigationQueue: NavigationDirection[] = [];
+	private isProcessingNavigation = false;
+	private navigationSequence = 0;
+	private backHotkeys = DEFAULT_HOTKEYS['cursor-history:go-back'];
+	private forwardHotkeys = DEFAULT_HOTKEYS['cursor-history:go-forward'];
 
 	onload() {
 		this.addCommand({
 			id: 'go-back',
 			name: 'Go back',
-			callback: () => void this.goBack(),
+			callback: () => this.queueNavigation('back'),
 		});
 
 		this.addCommand({
 			id: 'go-forward',
 			name: 'Go forward',
-			callback: () => void this.goForward(),
+			callback: () => this.queueNavigation('forward'),
 		});
+
+		this.registerDomEvent(
+			window,
+			'keydown',
+			(event) => this.handleRepeatedHotkey(event),
+			{ capture: true }
+		);
 
 		// Listen for pane switches
 		this.registerEvent(
@@ -83,12 +97,12 @@ export default class CursorHistoryPlugin extends Plugin {
 	}
 
 	private buildKeymap(): void {
-		const backKeys = resolveHotkeys(
+		this.backHotkeys = resolveHotkeys(
 			this.app.hotkeyManager,
 			'cursor-history:go-back',
 			DEFAULT_HOTKEYS['cursor-history:go-back']
 		);
-		const forwardKeys = resolveHotkeys(
+		this.forwardHotkeys = resolveHotkeys(
 			this.app.hotkeyManager,
 			'cursor-history:go-forward',
 			DEFAULT_HOTKEYS['cursor-history:go-forward']
@@ -96,17 +110,17 @@ export default class CursorHistoryPlugin extends Plugin {
 
 		const bindings: Array<{ key: string; run: () => boolean }> = [];
 
-		for (const hk of backKeys) {
+		for (const hk of this.backHotkeys) {
 			bindings.push({
 				key: [...hk.modifiers, hk.key].join('-'),
-				run: () => { void this.goBack(); return true; },
+				run: () => { this.queueNavigation('back'); return true; },
 			});
 		}
 
-		for (const hk of forwardKeys) {
+		for (const hk of this.forwardHotkeys) {
 			bindings.push({
 				key: [...hk.modifiers, hk.key].join('-'),
-				run: () => { void this.goForward(); return true; },
+				run: () => { this.queueNavigation('forward'); return true; },
 			});
 		}
 
@@ -115,6 +129,50 @@ export default class CursorHistoryPlugin extends Plugin {
 			this.hotkeyExtension.push(keymap.of(bindings));
 		}
 		this.app.workspace.updateOptions();
+	}
+
+	private handleRepeatedHotkey(event: KeyboardEvent): void {
+		if (!event.repeat) return;
+
+		let direction: NavigationDirection | null = null;
+		if (this.backHotkeys.some((hotkey) => matchesHotkey(event, hotkey))) {
+			direction = 'back';
+		} else if (this.forwardHotkeys.some((hotkey) => matchesHotkey(event, hotkey))) {
+			direction = 'forward';
+		}
+		if (!direction) return;
+
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		this.queueNavigation(direction);
+	}
+
+	private queueNavigation(direction: NavigationDirection): void {
+		this.navigationQueue.push(direction);
+		void this.processNavigationQueue();
+	}
+
+	private async processNavigationQueue(): Promise<void> {
+		if (this.isProcessingNavigation) return;
+		this.isProcessingNavigation = true;
+
+		try {
+			let direction = this.navigationQueue.shift();
+			while (direction) {
+				try {
+					if (direction === 'back') {
+						await this.goBack();
+					} else {
+						await this.goForward();
+					}
+				} catch (error) {
+					console.error('Cursor History navigation failed', error);
+				}
+				direction = this.navigationQueue.shift();
+			}
+		} finally {
+			this.isProcessingNavigation = false;
+		}
 	}
 
 	private recordCurrentPosition(isJump = false): void {
@@ -172,6 +230,7 @@ export default class CursorHistoryPlugin extends Plugin {
 	}
 
 	private async navigateTo(entry: HistoryEntry): Promise<void> {
+		const navigationSequence = ++this.navigationSequence;
 		this.isNavigating = true;
 
 		try {
@@ -195,13 +254,28 @@ export default class CursorHistoryPlugin extends Plugin {
 					},
 					true
 				);
+				editor.focus();
 			}
 
 			this.currentState = entry;
 		} finally {
 			window.setTimeout(() => {
-				this.isNavigating = false;
+				if (navigationSequence === this.navigationSequence) {
+					this.isNavigating = false;
+				}
 			}, 100);
 		}
 	}
+}
+
+function matchesHotkey(event: KeyboardEvent, hotkey: ObsidianHotkey): boolean {
+	const modifiers = new Set(hotkey.modifiers);
+	const modIsControl = modifiers.has('Mod') && !Platform.isMacOS;
+	const modIsMeta = modifiers.has('Mod') && Platform.isMacOS;
+
+	return event.key.toLowerCase() === hotkey.key.toLowerCase()
+		&& event.altKey === modifiers.has('Alt')
+		&& event.ctrlKey === (modifiers.has('Ctrl') || modIsControl)
+		&& event.metaKey === (modifiers.has('Meta') || modIsMeta)
+		&& event.shiftKey === modifiers.has('Shift');
 }

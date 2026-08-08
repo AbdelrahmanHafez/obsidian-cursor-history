@@ -4,10 +4,22 @@ import { test } from 'node:test';
 import { EditorState } from '@codemirror/state';
 import { isJumpTransaction } from '../src/selection-events.ts';
 
-test('treats cursor selection events as jumps', () => {
+test('does not treat ordinary cursor selection as a jump', () => {
 	// Arrange
 	const state = EditorState.create({ doc: 'Hello' });
 	const transaction = state.update({ selection: { anchor: 3 }, userEvent: 'select.pointer' });
+
+	// Act
+	const isJump = isJumpTransaction(transaction);
+
+	// Assert
+	assert.equal(isJump, false);
+});
+
+test('treats an explicitly annotated navigation as a jump', () => {
+	// Arrange
+	const state = EditorState.create({ doc: 'Hello' });
+	const transaction = state.update({ selection: { anchor: 3 }, userEvent: 'navigation' });
 
 	// Act
 	const isJump = isJumpTransaction(transaction);

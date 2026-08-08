@@ -10,7 +10,7 @@ export interface HistoryEntry {
 	selection: Selection;
 }
 
-const MAX_STACK_SIZE = 50;
+const MAX_STACK_SIZE = 200;
 
 export class NavigationStack {
 	private stack: HistoryEntry[] = [];
