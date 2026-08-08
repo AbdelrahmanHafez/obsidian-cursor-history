@@ -1,6 +1,6 @@
 import { Transaction } from '@codemirror/state';
 
-const NON_JUMP_EVENTS = ['input', 'delete', 'undo', 'redo'];
+const NON_JUMP_EVENTS = ['input', 'delete', 'move', 'select', 'undo', 'redo'];
 
 export function isJumpTransaction(transaction: Transaction): boolean {
 	const event = transaction.annotation(Transaction.userEvent);

@@ -31,7 +31,7 @@ The demo moves through several saved positions inside long notes, then crosses b
 - Navigates backward and forward through recent cursor and selection locations
 - Groups ordinary movements within 10 lines into one stop, while deliberate jumps create new stops
 - Creates a new stop when you change files
-- Keeps up to 50 positions for the current Obsidian session
+- Keeps up to 200 positions for the current Obsidian session
 
 Going back and then navigating somewhere new clears the forward history, matching browser behavior.
 
