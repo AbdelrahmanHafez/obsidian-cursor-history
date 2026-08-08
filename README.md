@@ -19,7 +19,7 @@
 
 ![Cursor History demo showing back and forward navigation with visible keyboard shortcuts](docs/assets/cursor-history-demo.gif)
 
-The demo saves three widely separated selections in **Aurora Launch**, opens **Friday Review**, then goes Back through the exact three positions in the first note. Forward replays the route.
+The demo moves through several saved positions inside long notes, then crosses between notes. The live keystroke display appears as each navigation happens.
 
 <p align="center">
   <a href="docs/assets/cursor-history-demo.mp4">Watch the full-quality recording</a>
