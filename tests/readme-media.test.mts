@@ -59,9 +59,44 @@ describe('README demo media', () => {
 		assert.ok(demoVideo.size <= 10 * 1024 * 1024);
 	});
 
+	it('centers the install button label without a leading icon', async () => {
+		// Arrange
+		const { installButton } = await createTestContext();
+		const rect = getSvgElementAttributes(installButton, 'rect');
+		const text = getSvgElementAttributes(installButton, 'text');
+
+		// Act
+		const visibleElements = [
+			...installButton.matchAll(/<(rect|path|text)\b/g),
+		].map((match) => match[1]);
+		const labelX = Number(text.get('x'));
+		const buttonCenterX =
+			Number(rect.get('x')) + Number(rect.get('width')) / 2;
+
+		// Assert
+		assert.deepEqual(
+			{
+				visibleElements,
+				labelX,
+				labelAnchor: text.get('text-anchor'),
+				labelIsCentered: labelX === buttonCenterX,
+			},
+			{
+				visibleElements: ['rect', 'text'],
+				labelX: 143,
+				labelAnchor: 'middle',
+				labelIsCentered: true,
+			}
+		);
+	});
+
 	async function createTestContext({ root = new URL('../', import.meta.url) } = {}) {
-		const readme = await readFile(new URL('README.md', root), 'utf8');
+		const [installButton, readme] = await Promise.all([
+			readFile(new URL('docs/assets/install-in-obsidian.svg', root), 'utf8'),
+			readFile(new URL('README.md', root), 'utf8'),
+		]);
 		return {
+			installButton,
 			readme,
 			async asset(relativePath: string) {
 				const url = new URL(relativePath, root);
@@ -75,5 +110,16 @@ describe('README demo media', () => {
 				};
 			},
 		};
+	}
+
+	function getSvgElementAttributes(svg: string, elementName: string) {
+		const element = svg.match(new RegExp(`<${elementName}\\b[^>]*>`))?.[0];
+		assert.ok(element, `Expected SVG to contain a ${elementName} element`);
+		return new Map(
+			[...element.matchAll(/\b([\w:-]+)="([^"]*)"/g)].map((match) => [
+				match[1],
+				match[2],
+			])
+		);
 	}
 });
