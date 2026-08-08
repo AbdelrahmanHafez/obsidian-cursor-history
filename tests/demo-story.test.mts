@@ -11,6 +11,7 @@ const SAME_NOTE_TOLERANCE = 0.003;
 const DIFFERENT_NOTE_THRESHOLD = 0.01;
 const DISTINCT_STOP_THRESHOLD = 0.015;
 const RESTORED_STOP_TOLERANCE = 0.006;
+const UNRELATED_HIGHLIGHT_LIMIT = 250;
 
 const SAMPLE_TIMES = {
 	a: 0.75,
@@ -49,6 +50,7 @@ describe('Cursor History demo story', () => {
 			b: regionDistance(b, backToB, EDITOR_BODY),
 			a: regionDistance(a, backToA, EDITOR_BODY),
 		};
+		const unrelatedHighlights = countYellowHighlightPixels(d, EDITOR_BODY);
 
 		// Assert
 		assert.ok(
@@ -82,6 +84,10 @@ describe('Cursor History demo story', () => {
 		assert.ok(
 			restorationDistances.a <= RESTORED_STOP_TOLERANCE,
 			`the third Back action must restore stop A; visual distance was ${formatDistance(restorationDistances.a)}`
+		);
+		assert.ok(
+			unrelatedHighlights <= UNRELATED_HIGHLIGHT_LIMIT,
+			`stop D must show only its active selection; found ${unrelatedHighlights} yellow search-highlight pixels`
 		);
 	});
 
@@ -155,6 +161,33 @@ function regionDistance(
 	}
 
 	return totalDifference / (region.width * region.height * 3 * 255);
+}
+
+function countYellowHighlightPixels(
+	frame: Buffer,
+	region: { x: number; y: number; width: number; height: number }
+) {
+	let count = 0;
+
+	for (let y = region.y; y < region.y + region.height; ++y) {
+		for (let x = region.x; x < region.x + region.width; ++x) {
+			const offset = (y * FRAME_WIDTH + x) * 3;
+			const red = frame[offset];
+			const green = frame[offset + 1];
+			const blue = frame[offset + 2];
+			if (
+				red >= 70 &&
+				green >= 55 &&
+				blue <= 65 &&
+				red - blue >= 35 &&
+				green - blue >= 20
+			) {
+				count++;
+			}
+		}
+	}
+
+	return count;
 }
 
 function formatDistance(distance: number) {
