@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>Go back to the exact place you were.</strong><br>
-  Return to exact cursor positions across Obsidian notes, like Back and Forward in a browser.
+  Move through exact cursor and selection positions, including several places inside one Obsidian note.
 </p>
 
 <p align="center">
@@ -11,13 +11,15 @@
   </a>
 </p>
 
-| Three notes later | Back to the exact selection |
+| One note, several positions | Back to an earlier selection in the same note |
 | --- | --- |
-| ![Cursor History at the latest cursor position](docs/assets/cursor-history-latest.png) | ![Cursor History navigating back to an earlier selection](docs/assets/cursor-history-back.png) |
+| ![Latest Cursor History view with a selected sentence in Aurora Launch](docs/assets/cursor-history-latest.png) | ![Cursor History Back shortcut shown over an earlier selection in Aurora Launch](docs/assets/cursor-history-back.png) |
 
 ## See it in action
 
 ![Cursor History demo showing back and forward navigation with visible keyboard shortcuts](docs/assets/cursor-history-demo.gif)
+
+The demo saves three widely separated selections in **Aurora Launch**, opens **Friday Review**, then goes Back through the exact three positions in the first note. Forward replays the route.
 
 <p align="center">
   <a href="docs/assets/cursor-history-demo.mp4">Watch the full-quality recording</a>
@@ -26,9 +28,9 @@
 ## What it does
 
 - Reopens the note, restores the exact cursor or selection, and brings it into view
-- Navigates backward and forward through recent editing locations
-- Groups ordinary movements within 10 lines into one history stop
-- Creates a new stop for file changes and explicit cursor jumps
+- Navigates backward and forward through recent cursor and selection locations
+- Groups ordinary movements within 10 lines into one stop, while deliberate jumps create new stops
+- Creates a new stop when you change files
 - Keeps up to 50 positions for the current Obsidian session
 
 Going back and then navigating somewhere new clears the forward history, matching browser behavior.
