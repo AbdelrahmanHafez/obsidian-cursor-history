@@ -43,9 +43,17 @@ export default class CursorHistoryPlugin extends Plugin {
 			callback: () => void this.goForward(),
 		});
 
-		// Listen for file switches
+		// Listen for pane switches
 		this.registerEvent(
 			this.app.workspace.on('active-leaf-change', () => {
+				if (this.isNavigating) return;
+				this.recordCurrentPosition();
+			})
+		);
+
+		// Opening another file in the same pane does not change the active leaf
+		this.registerEvent(
+			this.app.workspace.on('file-open', () => {
 				if (this.isNavigating) return;
 				this.recordCurrentPosition();
 			})
@@ -65,7 +73,10 @@ export default class CursorHistoryPlugin extends Plugin {
 
 		// CM6 keymaps for key-repeat support
 		this.registerEditorExtension(this.hotkeyExtension);
-		this.app.workspace.onLayoutReady(() => this.buildKeymap());
+		this.app.workspace.onLayoutReady(() => {
+			this.buildKeymap();
+			this.recordCurrentPosition();
+		});
 		this.registerEvent(
 			this.app.workspace.on('layout-change', () => this.buildKeymap())
 		);
